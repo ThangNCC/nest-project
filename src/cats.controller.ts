@@ -1,25 +1,48 @@
+/* eslint-disable prettier/prettier */
 import {
-  Controller,
-  Get,
-  Query,
-  Post,
   Body,
-  Put,
-  Param,
+  Controller,
   Delete,
+  Get, HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  UseFilters,
+  UseGuards,
+  UseInterceptors,
+  UsePipes
 } from '@nestjs/common';
-import { CreateCatDto, UpdateCatDto, ListAllEntities } from './dto';
+import * as Joi from 'joi';
+import { CatsService } from './cats.service';
+import { CreateCatDto, UpdateCatDto } from './dto';
+import { HttpExceptionFilter } from './http-exception.filter';
+import { LoggingInterceptor } from './logging.interceptor';
+import { Roles } from './roles.decorator';
+import { RolesGuard } from './roles.guard';
+import { JoiValidationPipe } from './validation.pipe';
 
+const createCatschema = Joi.object().keys({
+  name: Joi.string().required(),
+  age: Joi.number(),
+  breed: Joi.string(),
+});
+const catsService = new CatsService();
 @Controller('cats')
+@UseFilters(HttpExceptionFilter)
+@UseGuards(RolesGuard)
+@UseInterceptors(LoggingInterceptor)
 export class CatsController {
   @Post()
-  create(@Body() createCatDto: CreateCatDto) {
-    return 'This action adds a new cat';
+  @Roles('admin')
+  @UsePipes(new JoiValidationPipe(createCatschema))
+  async create(@Body() createCatDto: CreateCatDto) {
+    catsService.create(createCatDto);
   }
 
   @Get()
   findAll(): string {
-    return 'This action returns all cats';
+    return "All cats"
   }
 
   // @Get()
@@ -27,9 +50,17 @@ export class CatsController {
   //   return `This action returns all cats (limit: ${query.limit} items)`;
   // }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return `This action returns a #${id} cat`;
+  @Get(':name')
+  async findOne(
+    @Param(
+      'name',
+      new ParseIntPipe({ errorHttpStatusCode: HttpStatus.NOT_ACCEPTABLE }),
+    )
+    name: string,
+  ) {
+    console.log(name, '=============');
+
+    return catsService.findOne(name);
   }
 
   @Put(':id')
